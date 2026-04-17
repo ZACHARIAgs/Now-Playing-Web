@@ -56,9 +56,9 @@ html, body {
 }
 
 #album-art-border {
-    width: 110px;
-    height: 110px;
-    border-radius: 12px;
+    width: 165px;
+    height: 165px;
+    border-radius: 16px;
     overflow: hidden;
     background-color: rgba(0, 0, 0, 0.2);
     flex-shrink: 0;
