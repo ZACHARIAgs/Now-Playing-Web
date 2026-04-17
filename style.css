@@ -28,7 +28,7 @@ html, body {
     object-fit: cover;
     filter: blur(40px);
     animation: rotate 60s linear infinite;
-    opacity: 0.5; /* Additional darkening */
+    opacity: 0.75; /* Brighter background */
 }
 
 @keyframes rotate {
@@ -40,7 +40,7 @@ html, body {
 #overlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.3);
     z-index: 2;
 }
 
@@ -87,11 +87,11 @@ html, body {
 }
 
 #title-container {
-    height: 45px;
+    height: 65px;
 }
 
 #artist-container {
-    height: 35px;
+    height: 45px;
     margin-top: 5px;
 }
 
@@ -101,7 +101,7 @@ html, body {
 
 .marquee-text {
     color: white;
-    font-size: 32px;
+    font-size: 48px;
     font-weight: bold;
     display: inline-block;
     padding-right: 60px; /* same as gap in WPF */
@@ -109,7 +109,7 @@ html, body {
 
 .marquee-text-small {
     color: #DDDDDD;
-    font-size: 20px;
+    font-size: 30px;
     display: inline-block;
     padding-right: 60px; /* same as gap in WPF */
 }
