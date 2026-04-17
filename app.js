@@ -246,13 +246,20 @@ function updateUI(title, artist, imageUrl, isPlaying) {
 
 // ====== MARQUEE LOGIC ======
 function setupMarquee(container, wrapper, textElement) {
-    // Remove duplication if exists
-    const children = Array.from(wrapper.children);
-    if (children.length > 1) {
-        wrapper.removeChild(children[1]);
+    // Cancel any running animations to prevent ghost scrolling
+    if (currentAnimations.has(wrapper)) {
+        const anim = currentAnimations.get(wrapper);
+        if (anim.type === 'timeout') clearTimeout(anim.id);
+        if (anim.type === 'frame') cancelAnimationFrame(anim.id);
+        currentAnimations.delete(wrapper);
     }
 
-    wrapper.style.transform = 'translateX(0)';
+    // Remove any cloned elements completely
+    while (wrapper.children.length > 1) {
+        wrapper.removeChild(wrapper.lastChild);
+    }
+
+    wrapper.style.transform = 'translate3d(0px, 0, 0)';
     wrapper.style.transition = 'none';
 
     // Measure
@@ -273,7 +280,7 @@ function setupMarquee(container, wrapper, textElement) {
         if (isPortrait && containerWidth > 0) {
             const offset = (containerWidth - textWidth) / 2;
             if (offset > 0) {
-                wrapper.style.transform = `translateX(${offset}px)`;
+                wrapper.style.transform = `translate3d(${offset}px, 0, 0)`;
             }
         }
     }
