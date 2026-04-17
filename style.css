@@ -128,13 +128,13 @@ html, body {
     #album-art-border {
         width: min(calc(100vw - 60px), calc(100vh - 200px));
         height: min(calc(100vw - 60px), calc(100vh - 200px));
-        margin: auto auto 20px auto;
+        margin: 0 auto 20px auto;
         border-radius: 20px;
     }
 
     #text-container {
         margin-left: 0;
-        text-align: center;
+        text-align: left;
         flex-grow: 0;
     }
 
