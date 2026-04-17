@@ -29,11 +29,13 @@ html, body {
     filter: blur(40px);
     animation: rotate 60s linear infinite;
     opacity: 0.75; /* Brighter background */
+    will-change: transform;
+    transform: translateZ(0); /* Cache the blurred image on the GPU */
 }
 
 @keyframes rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from { transform: rotate(0deg) translateZ(0); }
+    to { transform: rotate(360deg) translateZ(0); }
 }
 
 /* Overlay to darken background */
@@ -97,6 +99,7 @@ html, body {
 
 .marquee-wrapper {
     display: inline-block;
+    will-change: transform; /* Hardware Acceleration */
 }
 
 .marquee-text {

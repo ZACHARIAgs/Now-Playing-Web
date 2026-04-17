@@ -7,6 +7,7 @@ const SCOPES = 'user-read-currently-playing user-read-playback-state';
 
 let accessToken = null;
 let currentTrackId = null;
+let currentIsPlaying = null;
 
 // ====== UI ELEMENTS ======
 const loginOverlay = document.getElementById('login-overlay');
@@ -19,6 +20,7 @@ const titleWrapper = document.getElementById('title-wrapper');
 const artistWrapper = document.getElementById('artist-wrapper');
 const titleContainer = document.getElementById('title-container');
 const artistContainer = document.getElementById('artist-container');
+const contentContainer = document.getElementById('content-container');
 
 
 // ====== AUTHENTICATION ======
@@ -174,7 +176,11 @@ async function fetchNowPlaying() {
 
         if (response.status === 204) {
             // 204 means nothing is playing right now
-            updateUI('Nothing playing', '', null, null);
+            if (currentTrackId !== 'none' || currentIsPlaying !== false) {
+                currentTrackId = 'none';
+                currentIsPlaying = false;
+                updateUI('Nothing playing', '', null, false);
+            }
             return;
         }
 
@@ -198,11 +204,10 @@ async function fetchNowPlaying() {
                 imageUrl = data.item.album.images[0].url;
             }
 
-            if (data.item.id !== currentTrackId) {
+            if (data.item.id !== currentTrackId || isPlaying !== currentIsPlaying) {
                 currentTrackId = data.item.id;
+                currentIsPlaying = isPlaying;
                 updateUI(trackName, artistName, imageUrl, isPlaying);
-            } else {
-                // just update play state if needed, though this UI doesn't strictly show play/pause
             }
         }
     } catch (e) {
@@ -212,6 +217,15 @@ async function fetchNowPlaying() {
 
 
 function updateUI(title, artist, imageUrl, isPlaying) {
+    if (title === 'Nothing playing' || isPlaying === false) {
+        contentContainer.style.display = 'none';
+        backgroundImage.style.display = 'none';
+        return; // Skip rest of updates to leave it black
+    } else {
+        contentContainer.style.display = '';
+        backgroundImage.style.display = '';
+    }
+
     titleText.innerText = title;
     artistText.innerText = artist;
 
@@ -270,36 +284,51 @@ const currentAnimations = new Map();
 
 function animateMarquee(wrapper, scrollWidth) {
     if (currentAnimations.has(wrapper)) {
-        clearTimeout(currentAnimations.get(wrapper));
+        const anim = currentAnimations.get(wrapper);
+        if (anim.type === 'timeout') clearTimeout(anim.id);
+        if (anim.type === 'frame') cancelAnimationFrame(anim.id);
     }
 
     // Constants to match WPF app
     const initialDelay = 5000;
     const pixelsPerFrame = 0.8;
-    const msPerFrame = 16;
 
     let currentX = 0;
+    let lastTime = 0;
 
-    function step() {
-        currentX -= pixelsPerFrame;
+    function step(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const delta = timestamp - lastTime;
+        lastTime = timestamp;
+        
+        // Scale movement by delta time to keep speed consistent regardless of refresh rate
+        const speedMultiplier = delta / 16.66;
+        currentX -= (pixelsPerFrame * speedMultiplier);
 
         if (-currentX >= scrollWidth) {
             // Reset to beginning and pause
             currentX = 0;
-            wrapper.style.transform = `translateX(0px)`;
-            const timeoutId = setTimeout(step, initialDelay);
-            currentAnimations.set(wrapper, timeoutId);
+            wrapper.style.transform = `translate3d(0px, 0, 0)`;
+            lastTime = 0;
+            const timeoutId = setTimeout(() => {
+                const frameId = requestAnimationFrame(step);
+                currentAnimations.set(wrapper, { type: 'frame', id: frameId });
+            }, initialDelay);
+            currentAnimations.set(wrapper, { type: 'timeout', id: timeoutId });
         } else {
-            wrapper.style.transform = `translateX(${currentX}px)`;
-            const timeoutId = setTimeout(step, msPerFrame);
-            currentAnimations.set(wrapper, timeoutId);
+            wrapper.style.transform = `translate3d(${currentX}px, 0, 0)`;
+            const frameId = requestAnimationFrame(step);
+            currentAnimations.set(wrapper, { type: 'frame', id: frameId });
         }
     }
 
     // Start with delay
-    wrapper.style.transform = `translateX(0px)`;
-    const timeoutId = setTimeout(step, initialDelay);
-    currentAnimations.set(wrapper, timeoutId);
+    wrapper.style.transform = `translate3d(0px, 0, 0)`;
+    const timeoutId = setTimeout(() => {
+        const frameId = requestAnimationFrame(step);
+        currentAnimations.set(wrapper, { type: 'frame', id: frameId });
+    }, initialDelay);
+    currentAnimations.set(wrapper, { type: 'timeout', id: timeoutId });
 }
 
 // Handle resizing
