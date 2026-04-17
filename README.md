@@ -19,3 +19,9 @@ If you want to use it as an always-on dashboard on a tablet:
 3. Connect to your Spotify account, and lock it into full-screen mode!
 
 *Note: If using an older Kindle or Android device with an outdated certificate store, be sure to use Cloudflare Pages or enable "Ignore SSL Errors" in your Kiosk browser settings to ensure a smooth connection!*
+
+### Landscape Mode:
+<img width="1045" height="642" alt="image" src="https://github.com/user-attachments/assets/aa691a19-5281-4a55-acf6-a5334104dbae" />
+
+### Portrait Mode:
+<img width="550" height="784" alt="image" src="https://github.com/user-attachments/assets/e3135585-70ad-4b52-9a0d-7854483b267c" />
