@@ -217,7 +217,7 @@ async function fetchNowPlaying() {
 
 
 function updateUI(title, artist, imageUrl, isPlaying) {
-    if (title === 'Nothing playing' || isPlaying === false) {
+    if (title === 'Nothing playing' || title === 'Waiting for Spotify...' || isPlaying === false) {
         contentContainer.style.display = 'none';
         backgroundImage.style.display = 'none';
         return; // Skip rest of updates to leave it black
