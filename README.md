@@ -2,7 +2,7 @@
 
 A beautifully responsive, lightweight, and hardware-accelerated "Now Playing" web application for Spotify.
 
-##Just go to https://zachariags.github.io/Now-Playing-Web/
+## Just go to https://zachariags.github.io/Now-Playing-Web/
 
 This project was built to transform any unused screen into a stunning aesthetic music display. By running entirely in the browser using HTML, CSS, and Vanilla JavaScript with no backend required, it's incredibly portable. Whether you're displaying it on a secondary PC monitor, mounting an old iPad on the wall, or converting a dusty Android tablet into a smart dashboard, this app will adapt perfectly. 
 
