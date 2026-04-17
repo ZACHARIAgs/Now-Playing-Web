@@ -4,14 +4,12 @@ A beautifully responsive, lightweight, and hardware-accelerated "Now Playing" we
 
 ## Just go to https://zachariags.github.io/Now-Playing-Web/
 
-This project was built to transform any unused screen into a stunning aesthetic music display. By running entirely in the browser using HTML, CSS, and Vanilla JavaScript with no backend required, it's incredibly portable. Whether you're displaying it on a secondary PC monitor, mounting an old iPad on the wall, or converting a dusty Android tablet into a smart dashboard, this app will adapt perfectly. 
+This project was built to transform any unused screen into a cool music display. By running entirely in the browser using HTML, CSS, and Vanilla JavaScript with no backend required, it's incredibly portable. Whether you're displaying it on a secondary PC monitor, mounting an old iPad on the wall, or converting a dusty Kindle, this app is great. 
 
 ### Features
-**Immersive UI:** A full-screen, perfectly blurred, and infinitely rotating background that adapts automatically to the currently playing album art.  
-**Potato Ready:** The animations are heavily optimized using GPU hardware acceleration (`translate3d`), meaning it runs flawlessly and respects battery life even on extremely old hardware.  
-**Fully Responsive:** Custom portrait and landscape layout modes. When standing up, the UI stacks beautifully. When flat, it spreads out gracefully.  
-**Smart Screen Blackout:** If the music pauses or stops completely, the UI hides itself to preserve battery and fade into the background—lighting up again the second you press play.  
-**Self-Contained Auth:** Utilizes Spotify's modern PKCE Authorization Code flow, so users can log in securely on the device without needing a custom server.
+**Immersive UI:** A full-screen, blurred, and rotating background that adapts to the current album art.  
+**Potato Ready:** The animations are optimized using GPU hardware acceleration (`translate3d`), meaning it respects battery life even on old hardware.  
+**Fully Responsive:** Custom portrait and landscape layout modes. When standing up, the UI stacks vertically. When in landscape, it spreads out horizontally.  
 
 ### Running on an old Android Tablet
 This project was originally built explicitly to give an old Amazon Kindle Fire 7 a second life! 
