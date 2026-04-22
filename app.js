@@ -34,9 +34,9 @@ async function sha256(plain) {
 
 function base64encode(input) {
     return btoa(String.fromCharCode(...new Uint8Array(input)))
-      .replace(/=/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_');
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
 }
 
 function generateRandomString(length) {
@@ -48,14 +48,14 @@ function generateRandomString(length) {
 async function checkAuth() {
     const urlParams = new URLSearchParams(window.location.search);
     let code = urlParams.get('code');
-    
+
     const scopeVersion = localStorage.getItem('auth_scope_version');
     if (scopeVersion !== '2') {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.setItem('auth_scope_version', '2');
     }
-    
+
     accessToken = localStorage.getItem('access_token');
 
     if (code) {
@@ -63,14 +63,14 @@ async function checkAuth() {
         const payload = {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-              client_id: CLIENT_ID,
-              grant_type: 'authorization_code',
-              code: code,
-              redirect_uri: REDIRECT_URI,
-              code_verifier: codeVerifier,
+                client_id: CLIENT_ID,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: REDIRECT_URI,
+                code_verifier: codeVerifier,
             }),
         }
 
@@ -92,8 +92,8 @@ async function checkAuth() {
         } catch (e) {
             console.error("Token exchange failed", e);
         }
-    } 
-    
+    }
+
     if (accessToken) {
         loginOverlay.style.display = 'none';
         startPolling();
@@ -107,22 +107,22 @@ loginButton.addEventListener('click', async () => {
         alert('Please edit app.js to insert your Spotify Client ID first!');
         return;
     }
-    
+
     const codeVerifier = generateRandomString(64);
     window.localStorage.setItem('code_verifier', codeVerifier);
     const hashed = await sha256(codeVerifier);
     const codeChallenge = base64encode(hashed);
 
     const authUrl = new URL("https://accounts.spotify.com/authorize");
-    const params =  {
-      response_type: 'code',
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      code_challenge_method: 'S256',
-      code_challenge: codeChallenge,
-      redirect_uri: REDIRECT_URI,
+    const params = {
+        response_type: 'code',
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        code_challenge_method: 'S256',
+        code_challenge: codeChallenge,
+        redirect_uri: REDIRECT_URI,
     };
-    
+
     authUrl.search = new URLSearchParams(params).toString();
     window.location.href = authUrl.toString();
 });
@@ -139,12 +139,12 @@ async function refreshToken() {
     const payload = {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: CLIENT_ID,
-          grant_type: 'refresh_token',
-          refresh_token: refresh_token,
+            client_id: CLIENT_ID,
+            grant_type: 'refresh_token',
+            refresh_token: refresh_token,
         }),
     };
 
@@ -162,7 +162,7 @@ async function refreshToken() {
     } catch (e) {
         console.error("Error refreshing token", e);
     }
-    
+
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     window.location.reload();
@@ -216,9 +216,9 @@ async function fetchNowPlaying() {
                 currentTrackId = data.item.id;
                 currentIsPlaying = isPlaying;
                 updateUI(trackName, artistName, imageUrl, isPlaying);
+                
+                fadeOutSwipeTransition();
             }
-            
-            fadeOutSwipeTransition();
         }
     } catch (e) {
         console.error("Error fetching Spotify data", e);
@@ -317,7 +317,7 @@ function animateMarquee(wrapper, scrollWidth) {
         if (!lastTime) lastTime = timestamp;
         const delta = timestamp - lastTime;
         lastTime = timestamp;
-        
+
         // Scale movement by delta time to keep speed consistent regardless of refresh rate
         const speedMultiplier = delta / 16.66;
         currentX -= (pixelsPerFrame * speedMultiplier);
@@ -361,11 +361,11 @@ checkAuth();
 
 // ====== INTERACTION AND PLAYBACK CONTROL ======
 function fadeOutSwipeTransition() {
-    if (swipeOverlay.style.opacity === '1' || isProcessingSwipe) {
+    if (isProcessingSwipe) {
         swipeOverlay.style.transition = 'opacity 0.6s ease-out';
         swipeOverlay.style.opacity = '0';
         isProcessingSwipe = false;
-        
+
         // Reset transform after fade out so it's ready for next swipe
         setTimeout(() => {
             if (swipeOverlay.style.opacity === '0') {
@@ -392,7 +392,7 @@ async function spotifyAction(endpoint, method = 'POST') {
             console.log(`Action ${endpoint} failed. Note: Spotify requires an active device and Spotify Premium for remote control.`);
         }
         // Force an immediate poll to update UI visually
-        setTimeout(fetchNowPlaying, 500); 
+        setTimeout(fetchNowPlaying, 500);
     } catch (e) {
         console.error("Playback action failed", e);
     }
@@ -402,7 +402,7 @@ function togglePlayPause() {
     if (currentIsPlaying === null) return;
     if (currentIsPlaying) {
         spotifyAction('pause', 'PUT');
-        currentIsPlaying = false; 
+        currentIsPlaying = false;
         updateUI(titleText.innerText, artistText.innerText, backgroundImage.src, false);
     } else {
         spotifyAction('play', 'PUT');
@@ -417,6 +417,7 @@ let touchTime = 0;
 let lastTouchEnd = 0;
 let isDragging = false;
 let isProcessingSwipe = false;
+let touchSwipeDirection = null;
 
 document.addEventListener('touchstart', (e) => {
     if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
@@ -424,6 +425,7 @@ document.addEventListener('touchstart', (e) => {
     touchStartY = e.changedTouches[0].screenY;
     touchTime = Date.now();
     isDragging = true;
+    touchSwipeDirection = null;
     
     swipeOverlay.style.transition = 'none';
     swipeOverlay.style.opacity = '1';
@@ -437,13 +439,16 @@ document.addEventListener('touchmove', (e) => {
     const diffX = currentX - touchStartX;
     const diffY = currentY - touchStartY;
     
-    // Ensure it's a horizontal swipe
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+    if (!touchSwipeDirection) {
+        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+            touchSwipeDirection = Math.abs(diffX) > Math.abs(diffY) ? 'horizontal' : 'vertical';
+        }
+    }
+    
+    if (touchSwipeDirection === 'horizontal') {
         if (diffX > 0) {
-            // Dragging right, so overlay comes from left edge
             swipeOverlay.style.transform = `translateX(calc(-100% + ${diffX}px))`;
         } else {
-            // Dragging left, so overlay comes from right edge
             swipeOverlay.style.transform = `translateX(calc(100% + ${diffX}px))`;
         }
     }
@@ -460,7 +465,6 @@ document.addEventListener('touchend', (e) => {
     const diffY = touchEndY - touchStartY;
     const time = Date.now() - touchTime;
     
-    // Thresholds: at least 50px moved for a swipe. Time under 300ms for a tap.
     if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
         isProcessingSwipe = true;
         swipeOverlay.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
@@ -471,9 +475,14 @@ document.addEventListener('touchend', (e) => {
         } else {
             spotifyAction('next');
         }
+        
+        setTimeout(() => {
+            if (isProcessingSwipe) {
+                fadeOutSwipeTransition();
+            }
+        }, 3000);
     } else {
         if (Math.abs(diffX) > 10) {
-            // Cancel swipe, bounce back
             swipeOverlay.style.transition = 'transform 0.3s ease-out';
             if (diffX > 0) {
                 swipeOverlay.style.transform = 'translateX(-100%)';
@@ -484,7 +493,6 @@ document.addEventListener('touchend', (e) => {
                 if (!isProcessingSwipe) swipeOverlay.style.opacity = '0';
             }, 300);
         } else {
-            // Was a tap or micro-movement
             swipeOverlay.style.opacity = '0';
             swipeOverlay.style.transform = 'translateX(100%)';
             if (time < 300) togglePlayPause();
@@ -496,6 +504,6 @@ document.addEventListener('touchend', (e) => {
 document.addEventListener('click', (e) => {
     if (loginOverlay.style.display !== 'none') return;
     if (Date.now() - lastTouchEnd < 500) return; // Prevent ghost clicks from touch firing twice
-    
+
     togglePlayPause();
 });
