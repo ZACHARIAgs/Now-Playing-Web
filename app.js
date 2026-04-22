@@ -8,6 +8,8 @@ const SCOPES = 'user-read-currently-playing user-read-playback-state user-modify
 let accessToken = null;
 let currentTrackId = null;
 let currentIsPlaying = null;
+let currentShuffle = false;
+let currentRepeat = 'off';
 
 // ====== UI ELEMENTS ======
 const loginOverlay = document.getElementById('login-overlay');
@@ -215,9 +217,11 @@ async function fetchNowPlaying() {
                 currentTrackId = data.item.id;
                 currentIsPlaying = isPlaying;
                 updateUI(trackName, artistName, imageUrl, isPlaying);
-                
-                fadeOutSwipeTransition();
             }
+            
+            currentShuffle = data.shuffle_state;
+            currentRepeat = data.repeat_state;
+            fadeOutSwipeTransition();
         }
     } catch (e) {
         console.error("Error fetching Spotify data", e);
@@ -419,6 +423,7 @@ let lastTouchEnd = 0;
 let isDragging = false;
 let isProcessingSwipe = false;
 let touchSwipeDirection = null;
+let isTwoFingerTap = false;
 
 function abortSwipe(diffX) {
     if (!isDragging && swipeOverlay.style.opacity !== '1') return;
@@ -441,6 +446,11 @@ function abortSwipe(diffX) {
 
 document.addEventListener('touchstart', (e) => {
     if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
+    
+    if (e.touches.length >= 2) {
+        isTwoFingerTap = true;
+    }
+    
     touchStartX = e.changedTouches[0].screenX;
     touchStartY = e.changedTouches[0].screenY;
     touchTime = Date.now();
@@ -476,12 +486,25 @@ document.addEventListener('touchmove', (e) => {
 
 document.addEventListener('touchend', (e) => {
     if (!isDragging) return;
-    isDragging = false;
-    lastTouchEnd = Date.now();
     
     const diffX = e.changedTouches[0].screenX - touchStartX;
     const diffY = e.changedTouches[0].screenY - touchStartY;
     const time = Date.now() - touchTime;
+    
+    if (isTwoFingerTap) {
+        if (e.touches.length === 0) {
+            isDragging = false;
+            lastTouchEnd = Date.now();
+            if (time < 400 && Math.abs(diffX) < 30 && Math.abs(diffY) < 30) {
+                cyclePlaybackMode();
+            }
+            isTwoFingerTap = false;
+        }
+        return;
+    }
+    
+    isDragging = false;
+    lastTouchEnd = Date.now();
     
     if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
         isProcessingSwipe = true;
@@ -520,3 +543,79 @@ document.addEventListener('click', (e) => {
     
     togglePlayPause();
 });
+
+let popupTimeout = null;
+function showStatusPopup(iconHtml) {
+    const popup = document.getElementById('status-popup');
+    popup.innerHTML = iconHtml;
+    
+    if (iconHtml.includes('</svg><svg')) {
+        popup.style.gap = '10px';
+    } else {
+        popup.style.gap = '0px';
+    }
+    
+    popup.style.transition = 'none';
+    popup.style.opacity = '1';
+    
+    if (popupTimeout) clearTimeout(popupTimeout);
+    popupTimeout = setTimeout(() => {
+        popup.style.transition = 'opacity 0.3s ease-out';
+        popup.style.opacity = '0';
+    }, 1000);
+}
+
+function cyclePlaybackMode() {
+    let stateIdx = 0;
+    if (!currentShuffle && currentRepeat === 'off') stateIdx = 0;
+    else if (currentShuffle && currentRepeat === 'off') stateIdx = 1;
+    else if (!currentShuffle && currentRepeat === 'context') stateIdx = 2;
+    else if (currentShuffle && currentRepeat === 'context') stateIdx = 3;
+    else if (currentRepeat === 'track') stateIdx = 4;
+    else stateIdx = 0; // fallback
+
+    stateIdx = (stateIdx + 1) % 5;
+    
+    let targetShuffle = false;
+    let targetRepeat = 'off';
+    let iconHtml = '';
+
+    const iconShuffle = `<svg viewBox="0 0 24 24"><path d="M10.59,9.17L5.41,4 4,5.41l5.17,5.17 1.42,-1.41zM14.5,4l2.04,2.04L4,18.59 5.41,20 17.96,7.46 20,9.5V4h-5.5zm.33,9.41l-1.41,1.41 3.13,3.13L14.5,20H20v-5.5l-2.04,2.04-3.13-3.13z"/></svg>`;
+    const iconLoop = `<svg viewBox="0 0 24 24"><path d="M7,7h10v3l4,-4 -4,-4v3H5v6h2V7zm10,10H7v-3l-4,4 4,4v-3h12v-6h-2v4z"/></svg>`;
+    const iconLoopOne = `<svg viewBox="0 0 24 24"><path d="M13,15V9h-1l-2,1v1h1.5v4H13zm-6,-8h10v3l4,-4 -4,-4v3H5v6h2V7zm10,10H7v-3l-4,4 4,4v-3h12v-6h-2v4z"/></svg>`;
+    const iconDash = `<svg viewBox="0 0 24 24"><path d="M4,11h16v2H4z"/></svg>`;
+
+    switch(stateIdx) {
+        case 0:
+            targetShuffle = false; targetRepeat = 'off';
+            iconHtml = iconDash;
+            break;
+        case 1:
+            targetShuffle = true; targetRepeat = 'off';
+            iconHtml = iconShuffle;
+            break;
+        case 2:
+            targetShuffle = false; targetRepeat = 'context';
+            iconHtml = iconLoop;
+            break;
+        case 3:
+            targetShuffle = true; targetRepeat = 'context';
+            iconHtml = iconShuffle + iconLoop;
+            break;
+        case 4:
+            targetShuffle = false; targetRepeat = 'track';
+            iconHtml = iconLoopOne;
+            break;
+    }
+    
+    if (targetShuffle !== currentShuffle) {
+        spotifyAction(`shuffle?state=${targetShuffle}`, 'PUT');
+        currentShuffle = targetShuffle;
+    }
+    if (targetRepeat !== currentRepeat) {
+        spotifyAction(`repeat?state=${targetRepeat}`, 'PUT');
+        currentRepeat = targetRepeat;
+    }
+
+    showStatusPopup(iconHtml);
+}
