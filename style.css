@@ -6,6 +6,8 @@ html, body {
     overflow: hidden;
     background-color: black;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overscroll-behavior: none; /* Prevent pull-to-refresh and overscroll glow */
+    touch-action: none; /* Disable all browser handling of gestures like pinch, zoom, and swipe-to-reload */
 }
 
 /* Background image rotation and blur */
