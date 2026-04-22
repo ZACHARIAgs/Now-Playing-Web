@@ -199,3 +199,25 @@ html, body {
     pointer-events: none; /* Let touches pass through */
     transform: translateX(100%); /* start offscreen */
 }
+
+/* Status Popup */
+#status-popup {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 150px; min-height: 150px;
+    padding: 30px;
+    box-sizing: border-box;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 24px;
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+}
+#status-popup svg {
+    width: 80px; height: 80px;
+    fill: #000;
+}
