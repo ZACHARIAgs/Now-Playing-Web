@@ -361,17 +361,24 @@ checkAuth();
 // ====== INTERACTION AND PLAYBACK CONTROL ======
 function fadeOutSwipeTransition() {
     if (isProcessingSwipe) {
-        swipeOverlay.style.transition = 'opacity 0.3s ease-out';
-        swipeOverlay.style.opacity = '0';
+        swipeOverlay.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        
+        if (lastSwipeOrigin === 'left') {
+            swipeOverlay.style.transform = 'translateX(-100%)';
+        } else {
+            swipeOverlay.style.transform = 'translateX(100%)';
+        }
+        
         isProcessingSwipe = false;
         
-        // Reset transform after fade out so it's ready for next swipe
+        // Hide it fully after it slides off screen
         setTimeout(() => {
-            if (swipeOverlay.style.opacity === '0') {
+            if (!isProcessingSwipe) {
+                swipeOverlay.style.opacity = '0';
                 swipeOverlay.style.transition = 'none';
                 swipeOverlay.style.transform = 'translateX(100%)';
             }
-        }, 300);
+        }, 400);
     }
 }
 
@@ -417,6 +424,7 @@ let lastTouchEnd = 0;
 let isDragging = false;
 let isProcessingSwipe = false;
 let touchSwipeDirection = null;
+let lastSwipeOrigin = 'right';
 
 document.addEventListener('touchstart', (e) => {
     if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
@@ -472,8 +480,10 @@ document.addEventListener('touchend', (e) => {
         swipeOverlay.style.transform = 'translateX(0)';
         
         if (diffX > 0) {
+            lastSwipeOrigin = 'left';
             spotifyAction('previous'); 
         } else {
+            lastSwipeOrigin = 'right';
             spotifyAction('next');
         }
         
@@ -499,6 +509,21 @@ document.addEventListener('touchend', (e) => {
             if (time < 300) togglePlayPause();
         }
     }
+});
+
+document.addEventListener('touchcancel', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    
+    // Safely abort the swipe and hide the black box if the OS interrupted the touch
+    swipeOverlay.style.transition = 'opacity 0.3s ease-out';
+    swipeOverlay.style.opacity = '0';
+    setTimeout(() => {
+        if (!isProcessingSwipe) {
+            swipeOverlay.style.transition = 'none';
+            swipeOverlay.style.transform = 'translateX(100%)';
+        }
+    }, 300);
 });
 
 // For PC testing or generic taps not caught by touch events
