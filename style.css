@@ -186,3 +186,14 @@ html, body {
     background-color: #1ed760;
     transform: scale(1.05);
 }
+
+/* Swipe transition overlay */
+#swipe-transition-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: black;
+    z-index: 5; /* Above content, below login overlay */
+    opacity: 0;
+    pointer-events: none; /* Let touches pass through */
+    transform: translateX(100%); /* start offscreen */
+}
