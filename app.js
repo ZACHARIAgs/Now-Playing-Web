@@ -361,7 +361,7 @@ checkAuth();
 // ====== INTERACTION AND PLAYBACK CONTROL ======
 function fadeOutSwipeTransition() {
     if (isProcessingSwipe) {
-        swipeOverlay.style.transition = 'opacity 0.6s ease-out';
+        swipeOverlay.style.transition = 'opacity 0.3s ease-out';
         swipeOverlay.style.opacity = '0';
         isProcessingSwipe = false;
         
@@ -371,7 +371,7 @@ function fadeOutSwipeTransition() {
                 swipeOverlay.style.transition = 'none';
                 swipeOverlay.style.transform = 'translateX(100%)';
             }
-        }, 600);
+        }, 300);
     }
 }
 
