@@ -3,7 +3,7 @@
 const CLIENT_ID = '6e3c8d68fdf94f2ebe2b5c847b4f6772';
 // The URL where this app is hosted (use http://127.0.0.1:8080/ for local dev, or your Vercel/GitHub pages URL for the final APK)
 const REDIRECT_URI = window.location.href.split('#')[0].split('?')[0];
-const SCOPES = 'user-read-currently-playing user-read-playback-state';
+const SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state';
 
 let accessToken = null;
 let currentTrackId = null;
@@ -47,6 +47,13 @@ function generateRandomString(length) {
 async function checkAuth() {
     const urlParams = new URLSearchParams(window.location.search);
     let code = urlParams.get('code');
+    
+    const scopeVersion = localStorage.getItem('auth_scope_version');
+    if (scopeVersion !== '2') {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.setItem('auth_scope_version', '2');
+    }
     
     accessToken = localStorage.getItem('access_token');
 
@@ -217,7 +224,7 @@ async function fetchNowPlaying() {
 
 
 function updateUI(title, artist, imageUrl, isPlaying) {
-    if (title === 'Nothing playing' || title === 'Waiting for Spotify...' || isPlaying === false) {
+    if (title === 'Nothing playing' || isPlaying === false) {
         contentContainer.style.display = 'none';
         backgroundImage.style.display = 'none';
         return; // Skip rest of updates to leave it black
@@ -348,3 +355,81 @@ window.addEventListener('resize', () => {
 
 // Run auth check on load
 checkAuth();
+
+// ====== INTERACTION AND PLAYBACK CONTROL ======
+async function spotifyAction(endpoint, method = 'POST') {
+    if (!accessToken) return;
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+            method: method,
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (response.status === 401) {
+            const refreshed = await refreshToken();
+            if (refreshed) spotifyAction(endpoint, method);
+            return;
+        }
+        if (response.status === 403 || response.status === 404) {
+            console.log(`Action ${endpoint} failed. Note: Spotify requires an active device and Spotify Premium for remote control.`);
+        }
+        // Force an immediate poll to update UI visually
+        setTimeout(fetchNowPlaying, 500); 
+    } catch (e) {
+        console.error("Playback action failed", e);
+    }
+}
+
+function togglePlayPause() {
+    if (currentIsPlaying === null) return;
+    if (currentIsPlaying) {
+        spotifyAction('pause', 'PUT');
+        currentIsPlaying = false; 
+        updateUI(titleText.innerText, artistText.innerText, backgroundImage.src, false);
+    } else {
+        spotifyAction('play', 'PUT');
+        currentIsPlaying = true;
+        updateUI(titleText.innerText, artistText.innerText, backgroundImage.src, true);
+    }
+}
+
+let touchStartX = 0;
+let touchStartY = 0;
+let touchTime = 0;
+let lastTouchEnd = 0;
+
+document.addEventListener('touchstart', (e) => {
+    if (loginOverlay.style.display !== 'none') return;
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+    touchTime = Date.now();
+});
+
+document.addEventListener('touchend', (e) => {
+    lastTouchEnd = Date.now();
+    if (loginOverlay.style.display !== 'none') return;
+    
+    const touchEndX = e.changedTouches[0].screenX;
+    const touchEndY = e.changedTouches[0].screenY;
+    const diffX = touchEndX - touchStartX;
+    const diffY = touchEndY - touchStartY;
+    const time = Date.now() - touchTime;
+    
+    // Thresholds: at least 50px moved for a swipe. Time under 300ms for a tap.
+    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+        if (diffX > 0) {
+            spotifyAction('previous'); // Swipe right = previous
+        } else {
+            spotifyAction('next');     // Swipe left = next
+        }
+    } else if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && time < 300) {
+        togglePlayPause();
+    }
+});
+
+// For PC testing or generic taps not caught by touch events
+document.addEventListener('click', (e) => {
+    if (loginOverlay.style.display !== 'none') return;
+    if (Date.now() - lastTouchEnd < 500) return; // Prevent ghost clicks from touch firing twice
+    
+    togglePlayPause();
+});
