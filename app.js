@@ -447,21 +447,22 @@ function abortSwipe(diffX) {
 document.addEventListener('touchstart', (e) => {
     if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
     
-    if (e.touches.length > maxTouches) {
-        maxTouches = e.touches.length;
-    }
-    
-    // Only set starting values when the FIRST finger touches
-    if (e.touches.length === 1) {
+    if (!isDragging) {
+        // Initialize new gesture regardless of how many fingers landed first
         touchStartX = e.touches[0].screenX;
         touchStartY = e.touches[0].screenY;
         touchTime = Date.now();
         isDragging = true;
         touchSwipeDirection = null;
-        maxTouches = 1;
+        maxTouches = e.touches.length;
         
         swipeOverlay.style.transition = 'none';
         swipeOverlay.style.opacity = '1';
+    } else {
+        // Update max touches if more fingers land mid-gesture
+        if (e.touches.length > maxTouches) {
+            maxTouches = e.touches.length;
+        }
     }
 });
 
