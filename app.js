@@ -423,7 +423,7 @@ let lastTouchEnd = 0;
 let isDragging = false;
 let isProcessingSwipe = false;
 let touchSwipeDirection = null;
-let isTwoFingerTap = false;
+let maxTouches = 0;
 
 function abortSwipe(diffX) {
     if (!isDragging && swipeOverlay.style.opacity !== '1') return;
@@ -447,22 +447,27 @@ function abortSwipe(diffX) {
 document.addEventListener('touchstart', (e) => {
     if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
     
-    if (e.touches.length >= 2) {
-        isTwoFingerTap = true;
+    if (e.touches.length > maxTouches) {
+        maxTouches = e.touches.length;
     }
     
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
-    touchTime = Date.now();
-    isDragging = true;
-    touchSwipeDirection = null;
-    
-    swipeOverlay.style.transition = 'none';
-    swipeOverlay.style.opacity = '1';
+    // Only set starting values when the FIRST finger touches
+    if (e.touches.length === 1) {
+        touchStartX = e.touches[0].screenX;
+        touchStartY = e.touches[0].screenY;
+        touchTime = Date.now();
+        isDragging = true;
+        touchSwipeDirection = null;
+        maxTouches = 1;
+        
+        swipeOverlay.style.transition = 'none';
+        swipeOverlay.style.opacity = '1';
+    }
 });
 
 document.addEventListener('touchmove', (e) => {
-    if (!isDragging || isProcessingSwipe) return;
+    // Disable drag logic if they are using 2 fingers
+    if (!isDragging || isProcessingSwipe || maxTouches >= 2) return;
     
     const currentX = e.changedTouches[0].screenX;
     const currentY = e.changedTouches[0].screenY;
@@ -487,24 +492,27 @@ document.addEventListener('touchmove', (e) => {
 document.addEventListener('touchend', (e) => {
     if (!isDragging) return;
     
+    // Wait until ALL fingers are off the screen before processing the gesture
+    if (e.touches.length > 0) return;
+    
+    isDragging = false;
+    lastTouchEnd = Date.now();
+    
     const diffX = e.changedTouches[0].screenX - touchStartX;
     const diffY = e.changedTouches[0].screenY - touchStartY;
     const time = Date.now() - touchTime;
     
-    if (isTwoFingerTap) {
-        if (e.touches.length === 0) {
-            isDragging = false;
-            lastTouchEnd = Date.now();
-            if (time < 400 && Math.abs(diffX) < 30 && Math.abs(diffY) < 30) {
-                cyclePlaybackMode();
-            }
-            isTwoFingerTap = false;
+    if (maxTouches >= 2) {
+        // Handle multi-finger tap
+        if (time < 500) {
+            cyclePlaybackMode();
+            swipeOverlay.style.opacity = '0';
+            swipeOverlay.style.transform = 'translateX(100%)';
+        } else {
+            abortSwipe(0);
         }
         return;
     }
-    
-    isDragging = false;
-    lastTouchEnd = Date.now();
     
     if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
         isProcessingSwipe = true;
@@ -529,6 +537,8 @@ document.addEventListener('touchend', (e) => {
 });
 
 document.addEventListener('touchcancel', (e) => {
+    if (!isDragging || e.touches.length > 0) return;
+    
     let diffX = 0;
     if (e.changedTouches && e.changedTouches.length > 0) {
         diffX = e.changedTouches[0].screenX - touchStartX;
