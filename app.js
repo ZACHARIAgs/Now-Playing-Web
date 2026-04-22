@@ -361,24 +361,17 @@ checkAuth();
 // ====== INTERACTION AND PLAYBACK CONTROL ======
 function fadeOutSwipeTransition() {
     if (isProcessingSwipe) {
-        swipeOverlay.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-        
-        if (lastSwipeOrigin === 'left') {
-            swipeOverlay.style.transform = 'translateX(-100%)';
-        } else {
-            swipeOverlay.style.transform = 'translateX(100%)';
-        }
-        
+        swipeOverlay.style.transition = 'opacity 0.3s ease-out';
+        swipeOverlay.style.opacity = '0';
         isProcessingSwipe = false;
         
-        // Hide it fully after it slides off screen
+        // Reset transform after fade out so it's ready for next swipe
         setTimeout(() => {
-            if (!isProcessingSwipe) {
-                swipeOverlay.style.opacity = '0';
+            if (swipeOverlay.style.opacity === '0') {
                 swipeOverlay.style.transition = 'none';
                 swipeOverlay.style.transform = 'translateX(100%)';
             }
-        }, 400);
+        }, 300);
     }
 }
 
@@ -424,7 +417,6 @@ let lastTouchEnd = 0;
 let isDragging = false;
 let isProcessingSwipe = false;
 let touchSwipeDirection = null;
-let lastSwipeOrigin = 'right';
 
 document.addEventListener('touchstart', (e) => {
     if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
@@ -480,10 +472,8 @@ document.addEventListener('touchend', (e) => {
         swipeOverlay.style.transform = 'translateX(0)';
         
         if (diffX > 0) {
-            lastSwipeOrigin = 'left';
             spotifyAction('previous'); 
         } else {
-            lastSwipeOrigin = 'right';
             spotifyAction('next');
         }
         
@@ -515,14 +505,21 @@ document.addEventListener('touchcancel', (e) => {
     if (!isDragging) return;
     isDragging = false;
     
-    // Safely abort the swipe and hide the black box if the OS interrupted the touch
-    swipeOverlay.style.transition = 'opacity 0.3s ease-out';
-    swipeOverlay.style.opacity = '0';
+    let diffX = 0;
+    if (e.changedTouches && e.changedTouches.length > 0) {
+        diffX = e.changedTouches[0].screenX - touchStartX;
+    }
+    
+    // Safely abort the swipe and bounce the black box back if the OS interrupted the touch
+    swipeOverlay.style.transition = 'transform 0.3s ease-out';
+    if (diffX > 0) {
+        swipeOverlay.style.transform = 'translateX(-100%)';
+    } else {
+        swipeOverlay.style.transform = 'translateX(100%)';
+    }
+    
     setTimeout(() => {
-        if (!isProcessingSwipe) {
-            swipeOverlay.style.transition = 'none';
-            swipeOverlay.style.transform = 'translateX(100%)';
-        }
+        if (!isProcessingSwipe) swipeOverlay.style.opacity = '0';
     }, 300);
 });
 
