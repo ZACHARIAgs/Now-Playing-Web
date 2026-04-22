@@ -21,6 +21,7 @@ const artistWrapper = document.getElementById('artist-wrapper');
 const titleContainer = document.getElementById('title-container');
 const artistContainer = document.getElementById('artist-container');
 const contentContainer = document.getElementById('content-container');
+const swipeOverlay = document.getElementById('swipe-transition-overlay');
 
 
 // ====== AUTHENTICATION ======
@@ -216,6 +217,8 @@ async function fetchNowPlaying() {
                 currentIsPlaying = isPlaying;
                 updateUI(trackName, artistName, imageUrl, isPlaying);
             }
+            
+            fadeOutSwipeTransition();
         }
     } catch (e) {
         console.error("Error fetching Spotify data", e);
@@ -357,6 +360,39 @@ window.addEventListener('resize', () => {
 checkAuth();
 
 // ====== INTERACTION AND PLAYBACK CONTROL ======
+function triggerSwipeTransition(direction) {
+    swipeOverlay.style.transition = 'none';
+    swipeOverlay.style.opacity = '1';
+    
+    if (direction === 'left') {
+        swipeOverlay.style.transform = 'translateX(100%)';
+    } else {
+        swipeOverlay.style.transform = 'translateX(-100%)';
+    }
+    
+    // Force reflow
+    swipeOverlay.offsetHeight;
+    
+    // Slide it in
+    swipeOverlay.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    swipeOverlay.style.transform = 'translateX(0)';
+}
+
+function fadeOutSwipeTransition() {
+    if (swipeOverlay.style.opacity === '1') {
+        swipeOverlay.style.transition = 'opacity 0.6s ease-out';
+        swipeOverlay.style.opacity = '0';
+        
+        // Reset transform after fade out so it's ready for next swipe
+        setTimeout(() => {
+            if (swipeOverlay.style.opacity === '0') {
+                swipeOverlay.style.transition = 'none';
+                swipeOverlay.style.transform = 'translateX(100%)';
+            }
+        }, 600);
+    }
+}
+
 async function spotifyAction(endpoint, method = 'POST') {
     if (!accessToken) return;
     try {
@@ -417,8 +453,10 @@ document.addEventListener('touchend', (e) => {
     // Thresholds: at least 50px moved for a swipe. Time under 300ms for a tap.
     if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
         if (diffX > 0) {
+            triggerSwipeTransition('right');
             spotifyAction('previous'); // Swipe right = previous
         } else {
+            triggerSwipeTransition('left');
             spotifyAction('next');     // Swipe left = next
         }
     } else if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && time < 300) {
