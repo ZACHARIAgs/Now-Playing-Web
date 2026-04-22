@@ -10,6 +10,7 @@ let currentTrackId = null;
 let currentIsPlaying = null;
 let currentShuffle = false;
 let currentRepeat = 'off';
+let lastModeChange = 0;
 
 // ====== UI ELEMENTS ======
 const loginOverlay = document.getElementById('login-overlay');
@@ -219,8 +220,11 @@ async function fetchNowPlaying() {
                 updateUI(trackName, artistName, imageUrl, isPlaying);
             }
             
-            currentShuffle = data.shuffle_state;
-            currentRepeat = data.repeat_state;
+            // Prevent Spotify API propagation delay from overwriting local state mid-cycle
+            if (Date.now() - lastModeChange > 4000) {
+                currentShuffle = data.shuffle_state;
+                currentRepeat = data.repeat_state;
+            }
             fadeOutSwipeTransition();
         }
     } catch (e) {
@@ -577,6 +581,7 @@ function showStatusPopup(iconHtml) {
 }
 
 function cyclePlaybackMode() {
+    lastModeChange = Date.now();
     let stateIdx = 0;
     if (!currentShuffle && currentRepeat === 'off') stateIdx = 0;
     else if (currentShuffle && currentRepeat === 'off') stateIdx = 1;
