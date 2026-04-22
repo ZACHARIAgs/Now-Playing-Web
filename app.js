@@ -360,28 +360,11 @@ window.addEventListener('resize', () => {
 checkAuth();
 
 // ====== INTERACTION AND PLAYBACK CONTROL ======
-function triggerSwipeTransition(direction) {
-    swipeOverlay.style.transition = 'none';
-    swipeOverlay.style.opacity = '1';
-    
-    if (direction === 'left') {
-        swipeOverlay.style.transform = 'translateX(100%)';
-    } else {
-        swipeOverlay.style.transform = 'translateX(-100%)';
-    }
-    
-    // Force reflow
-    swipeOverlay.offsetHeight;
-    
-    // Slide it in
-    swipeOverlay.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    swipeOverlay.style.transform = 'translateX(0)';
-}
-
 function fadeOutSwipeTransition() {
-    if (swipeOverlay.style.opacity === '1') {
+    if (swipeOverlay.style.opacity === '1' || isProcessingSwipe) {
         swipeOverlay.style.transition = 'opacity 0.6s ease-out';
         swipeOverlay.style.opacity = '0';
+        isProcessingSwipe = false;
         
         // Reset transform after fade out so it's ready for next swipe
         setTimeout(() => {
@@ -432,17 +415,44 @@ let touchStartX = 0;
 let touchStartY = 0;
 let touchTime = 0;
 let lastTouchEnd = 0;
+let isDragging = false;
+let isProcessingSwipe = false;
 
 document.addEventListener('touchstart', (e) => {
-    if (loginOverlay.style.display !== 'none') return;
+    if (loginOverlay.style.display !== 'none' || isProcessingSwipe) return;
     touchStartX = e.changedTouches[0].screenX;
     touchStartY = e.changedTouches[0].screenY;
     touchTime = Date.now();
+    isDragging = true;
+    
+    swipeOverlay.style.transition = 'none';
+    swipeOverlay.style.opacity = '1';
+});
+
+document.addEventListener('touchmove', (e) => {
+    if (!isDragging || isProcessingSwipe) return;
+    
+    const currentX = e.changedTouches[0].screenX;
+    const currentY = e.changedTouches[0].screenY;
+    const diffX = currentX - touchStartX;
+    const diffY = currentY - touchStartY;
+    
+    // Ensure it's a horizontal swipe
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+        if (diffX > 0) {
+            // Dragging right, so overlay comes from left edge
+            swipeOverlay.style.transform = `translateX(calc(-100% + ${diffX}px))`;
+        } else {
+            // Dragging left, so overlay comes from right edge
+            swipeOverlay.style.transform = `translateX(calc(100% + ${diffX}px))`;
+        }
+    }
 });
 
 document.addEventListener('touchend', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
     lastTouchEnd = Date.now();
-    if (loginOverlay.style.display !== 'none') return;
     
     const touchEndX = e.changedTouches[0].screenX;
     const touchEndY = e.changedTouches[0].screenY;
@@ -452,15 +462,33 @@ document.addEventListener('touchend', (e) => {
     
     // Thresholds: at least 50px moved for a swipe. Time under 300ms for a tap.
     if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+        isProcessingSwipe = true;
+        swipeOverlay.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        swipeOverlay.style.transform = 'translateX(0)';
+        
         if (diffX > 0) {
-            triggerSwipeTransition('right');
-            spotifyAction('previous'); // Swipe right = previous
+            spotifyAction('previous'); 
         } else {
-            triggerSwipeTransition('left');
-            spotifyAction('next');     // Swipe left = next
+            spotifyAction('next');
         }
-    } else if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15 && time < 300) {
-        togglePlayPause();
+    } else {
+        if (Math.abs(diffX) > 10) {
+            // Cancel swipe, bounce back
+            swipeOverlay.style.transition = 'transform 0.3s ease-out';
+            if (diffX > 0) {
+                swipeOverlay.style.transform = 'translateX(-100%)';
+            } else {
+                swipeOverlay.style.transform = 'translateX(100%)';
+            }
+            setTimeout(() => {
+                if (!isProcessingSwipe) swipeOverlay.style.opacity = '0';
+            }, 300);
+        } else {
+            // Was a tap or micro-movement
+            swipeOverlay.style.opacity = '0';
+            swipeOverlay.style.transform = 'translateX(100%)';
+            if (time < 300) togglePlayPause();
+        }
     }
 });
 
