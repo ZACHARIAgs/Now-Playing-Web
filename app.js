@@ -583,14 +583,14 @@ function showStatusPopup(iconHtml) {
 function cyclePlaybackMode() {
     lastModeChange = Date.now();
     let stateIdx = 0;
-    if (!currentShuffle && currentRepeat === 'off') stateIdx = 0;
-    else if (currentShuffle && currentRepeat === 'off') stateIdx = 1;
-    else if (!currentShuffle && currentRepeat === 'context') stateIdx = 2;
-    else if (currentShuffle && currentRepeat === 'context') stateIdx = 3;
-    else if (currentRepeat === 'track') stateIdx = 4;
+    
+    if (!currentShuffle && currentRepeat === 'off') stateIdx = 0; // none
+    else if (currentShuffle && currentRepeat === 'off') stateIdx = 1; // shuffle
+    else if (currentShuffle && currentRepeat === 'context') stateIdx = 2; // shuffle and loop
+    else if (!currentShuffle && currentRepeat === 'context') stateIdx = 3; // loop
     else stateIdx = 0; // fallback
 
-    stateIdx = (stateIdx + 1) % 5;
+    stateIdx = (stateIdx + 1) % 4;
     
     let targetShuffle = false;
     let targetRepeat = 'off';
@@ -598,7 +598,6 @@ function cyclePlaybackMode() {
 
     const iconShuffle = `<svg viewBox="0 0 24 24"><path d="M10.59,9.17L5.41,4 4,5.41l5.17,5.17 1.42,-1.41zM14.5,4l2.04,2.04L4,18.59 5.41,20 17.96,7.46 20,9.5V4h-5.5zm.33,9.41l-1.41,1.41 3.13,3.13L14.5,20H20v-5.5l-2.04,2.04-3.13-3.13z"/></svg>`;
     const iconLoop = `<svg viewBox="0 0 24 24"><path d="M7,7h10v3l4,-4 -4,-4v3H5v6h2V7zm10,10H7v-3l-4,4 4,4v-3h12v-6h-2v4z"/></svg>`;
-    const iconLoopOne = `<svg viewBox="0 0 24 24"><path d="M13,15V9h-1l-2,1v1h1.5v4H13zm-6,-8h10v3l4,-4 -4,-4v3H5v6h2V7zm10,10H7v-3l-4,4 4,4v-3h12v-6h-2v4z"/></svg>`;
     const iconDash = `<svg viewBox="0 0 24 24"><path d="M4,11h16v2H4z"/></svg>`;
 
     switch(stateIdx) {
@@ -611,16 +610,12 @@ function cyclePlaybackMode() {
             iconHtml = iconShuffle;
             break;
         case 2:
-            targetShuffle = false; targetRepeat = 'context';
-            iconHtml = iconLoop;
-            break;
-        case 3:
             targetShuffle = true; targetRepeat = 'context';
             iconHtml = iconShuffle + iconLoop;
             break;
-        case 4:
-            targetShuffle = false; targetRepeat = 'track';
-            iconHtml = iconLoopOne;
+        case 3:
+            targetShuffle = false; targetRepeat = 'context';
+            iconHtml = iconLoop;
             break;
     }
     
