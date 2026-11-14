@@ -12,6 +12,25 @@ let currentShuffle = false;
 let currentRepeat = 'off';
 let lastModeChange = 0;
 
+// ====== CLOCK STATE ======
+let isClockMode = false;
+let clockStyleIdx = parseInt(localStorage.getItem('clock_style') || '0', 10);
+if (Number.isNaN(clockStyleIdx) || clockStyleIdx < 0) clockStyleIdx = 0;
+clockStyleIdx = clockStyleIdx % 3;
+
+function isWithinNightSchedule(d = new Date()) {
+    const h = d.getHours();
+    return h >= 0 && h < 7;
+}
+
+let lastScheduleWindow = isWithinNightSchedule();
+let isClockDimmed = lastScheduleWindow;
+let clockIntervalId = null;
+let analogRafId = null;
+let analogGeometry = null;
+const flipValues = { 'flip-hours': null, 'flip-minutes': null };
+const flipTimers = { 'flip-hours': null, 'flip-minutes': null };
+
 // ====== UI ELEMENTS ======
 const loginOverlay = document.getElementById('login-overlay');
 const loginButton = document.getElementById('login-button');
@@ -25,6 +44,19 @@ const titleContainer = document.getElementById('title-container');
 const artistContainer = document.getElementById('artist-container');
 const contentContainer = document.getElementById('content-container');
 const swipeOverlay = document.getElementById('swipe-transition-overlay');
+const clockContainer = document.getElementById('clock-container');
+const clockFaces = [
+    document.getElementById('clock-flip'),
+    document.getElementById('clock-minimal'),
+    document.getElementById('clock-analog')
+];
+const minimalTimeEl = document.getElementById('minimal-time');
+const analogSvg = document.getElementById('analog-svg');
+const analogTicksGroup = document.getElementById('analog-ticks');
+const analogHourHand = document.getElementById('analog-hour-hand');
+const analogMinuteHand = document.getElementById('analog-minute-hand');
+const analogSecondHand = document.getElementById('analog-second-hand');
+const analogCenterDot = document.getElementById('analog-center-dot');
 
 // ====== AUTHENTICATION ======
 // PKCE Helpers
@@ -172,6 +204,7 @@ async function refreshToken() {
 }
 
 async function startPolling() {
+    setClockMode(true);
     fetchNowPlaying(); // fetch immediately
     setInterval(fetchNowPlaying, 5000); // then every 5 seconds
 }
@@ -225,7 +258,15 @@ async function fetchNowPlaying() {
                 currentShuffle = data.shuffle_state;
                 currentRepeat = data.repeat_state;
             }
-            fadeOutSwipeTransition();
+            if (!isClockMode) {
+                fadeOutSwipeTransition();
+            }
+        } else {
+            if (currentTrackId !== 'none' || currentIsPlaying !== false) {
+                currentTrackId = 'none';
+                currentIsPlaying = false;
+                updateUI('Nothing playing', '', null, false);
+            }
         }
     } catch (e) {
         console.error("Error fetching Spotify data", e);
@@ -235,12 +276,10 @@ async function fetchNowPlaying() {
 
 function updateUI(title, artist, imageUrl, isPlaying) {
     if (title === 'Nothing playing' || isPlaying === false) {
-        contentContainer.style.display = 'none';
-        backgroundImage.style.display = 'none';
-        return; // Skip rest of updates to leave it black
+        setClockMode(true);
+        return; // Skip rest of updates to display bedroom clock
     } else {
-        contentContainer.style.display = '';
-        backgroundImage.style.display = '';
+        setClockMode(false);
     }
 
     titleText.innerText = title;
@@ -361,7 +400,283 @@ window.addEventListener('resize', () => {
         setupMarquee(titleContainer, titleWrapper, titleText);
         setupMarquee(artistContainer, artistWrapper, artistText);
     }
+    buildAnalogTicks();
+    if (isClockMode && clockStyleIdx === 2) {
+        renderAnalogHands();
+    }
 });
+
+// ====== CLOCK LOGIC ======
+function applyClockDimState() {
+    if (!clockContainer) return;
+    if (isClockDimmed) {
+        clockContainer.classList.add('clock-dim-red');
+    } else {
+        clockContainer.classList.remove('clock-dim-red');
+    }
+}
+
+function toggleClockDim() {
+    isClockDimmed = !isClockDimmed;
+    applyClockDimState();
+}
+
+function applyClockStyle() {
+    clockFaces.forEach((face, idx) => {
+        if (!face) return;
+        if (idx === clockStyleIdx) {
+            face.classList.add('active');
+        } else {
+            face.classList.remove('active');
+        }
+    });
+
+    if (isClockMode && clockStyleIdx === 0) {
+        updateClock(false);
+    }
+
+    if (isClockMode && clockStyleIdx === 2) {
+        buildAnalogTicks();
+        startAnalogAnimation();
+    } else {
+        stopAnalogAnimation();
+    }
+}
+
+function setClockMode(enabled) {
+    isClockMode = enabled;
+    if (enabled) {
+        contentContainer.style.display = 'none';
+        backgroundImage.style.display = 'none';
+        clockContainer.style.display = 'flex';
+        applyClockDimState();
+        applyClockStyle();
+        updateClock(false);
+    } else {
+        clockContainer.style.display = 'none';
+        stopAnalogAnimation();
+        contentContainer.style.display = '';
+        backgroundImage.style.display = '';
+    }
+}
+
+function updateFlipUnit(unitId, newVal, animate) {
+    const unit = document.getElementById(unitId);
+    if (!unit) return;
+    const cardTop = unit.querySelector('.flip-card-top span');
+    const cardBottom = unit.querySelector('.flip-card-bottom span');
+    const leafTop = unit.querySelector('.flip-leaf-top span');
+    const leafBottom = unit.querySelector('.flip-leaf-bottom span');
+
+    const prevVal = flipValues[unitId];
+    if (prevVal === newVal) return;
+    flipValues[unitId] = newVal;
+
+    if (flipTimers[unitId]) {
+        clearTimeout(flipTimers[unitId]);
+        flipTimers[unitId] = null;
+    }
+
+    if (!animate || prevVal === null) {
+        unit.classList.remove('flipping');
+        cardTop.textContent = newVal;
+        cardBottom.textContent = newVal;
+        leafTop.textContent = newVal;
+        leafBottom.textContent = newVal;
+        return;
+    }
+
+    unit.classList.remove('flipping');
+    cardTop.textContent = newVal;
+    leafTop.textContent = prevVal;
+    cardBottom.textContent = prevVal;
+    leafBottom.textContent = newVal;
+
+    void unit.offsetWidth;
+    unit.classList.add('flipping');
+
+    flipTimers[unitId] = setTimeout(() => {
+        cardBottom.textContent = newVal;
+        leafTop.textContent = newVal;
+        unit.classList.remove('flipping');
+        flipTimers[unitId] = null;
+    }, 520);
+}
+
+function updateClock(animate = true) {
+    const now = new Date();
+    const currentWindow = isWithinNightSchedule(now);
+    if (currentWindow !== lastScheduleWindow) {
+        lastScheduleWindow = currentWindow;
+        isClockDimmed = currentWindow;
+        applyClockDimState();
+    }
+
+    const hours12 = (now.getHours() % 12) || 12;
+    const hoursStr = String(hours12);
+    const minutesStr = String(now.getMinutes()).padStart(2, '0');
+
+    if (minimalTimeEl) {
+        const timeText = `${hoursStr}:${minutesStr}`;
+        if (minimalTimeEl.textContent !== timeText) {
+            minimalTimeEl.textContent = timeText;
+        }
+    }
+
+    const shouldAnimateFlip = animate && isClockMode && clockStyleIdx === 0;
+    updateFlipUnit('flip-hours', hoursStr, shouldAnimateFlip);
+    updateFlipUnit('flip-minutes', minutesStr, shouldAnimateFlip);
+}
+
+function buildAnalogTicks() {
+    if (!analogSvg || !analogTicksGroup) return;
+    const W = window.innerWidth || 800;
+    const H = window.innerHeight || 600;
+    analogSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+    const cx = W / 2;
+    const cy = H / 2;
+    const padding = 20;
+    const rx = Math.max(40, W / 2 - padding);
+    const ry = Math.max(40, H / 2 - padding);
+    const cr = Math.min(rx, ry) * 0.22;
+    const ix = rx - cr;
+    const iy = ry - cr;
+
+    const minRadius = Math.max(30, Math.min(rx, ry) - 28);
+    analogGeometry = { cx, cy, minRadius };
+
+    const hourWidth = Math.max(6, Math.round(minRadius * 0.038));
+    const minuteWidth = Math.max(4, Math.round(minRadius * 0.022));
+    analogHourHand.setAttribute('stroke-width', String(hourWidth));
+    analogMinuteHand.setAttribute('stroke-width', String(minuteWidth));
+    analogSecondHand.setAttribute('stroke-width', '2');
+    analogCenterDot.setAttribute('cx', String(cx));
+    analogCenterDot.setAttribute('cy', String(cy));
+    analogCenterDot.setAttribute('r', String(Math.max(5, Math.round(minRadius * 0.028))));
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    while (analogTicksGroup.firstChild) {
+        analogTicksGroup.removeChild(analogTicksGroup.firstChild);
+    }
+
+    for (let i = 0; i < 60; i++) {
+        const theta = (i * 6) * Math.PI / 180;
+        const dx = Math.sin(theta);
+        const dy = -Math.cos(theta);
+        const ax = Math.abs(dx);
+        const ay = Math.abs(dy);
+
+        let t = 0;
+        let hitEdge = false;
+
+        if (ax > 1e-6) {
+            const tv = rx / ax;
+            if (tv * ay <= iy + 1e-6) {
+                t = tv;
+                hitEdge = true;
+            }
+        }
+        if (!hitEdge && ay > 1e-6) {
+            const th = ry / ay;
+            if (th * ax <= ix + 1e-6) {
+                t = th;
+                hitEdge = true;
+            }
+        }
+        if (!hitEdge) {
+            const b = ax * ix + ay * iy;
+            const c = ix * ix + iy * iy - cr * cr;
+            t = b + Math.sqrt(Math.max(0, b * b - c));
+        }
+
+        const isMajor = (i % 5 === 0);
+        const tickLen = isMajor ? 22 : 12;
+        const x1 = cx + t * dx;
+        const y1 = cy + t * dy;
+        const x2 = cx + (t - tickLen) * dx;
+        const y2 = cy + (t - tickLen) * dy;
+
+        const line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', x1.toFixed(2));
+        line.setAttribute('y1', y1.toFixed(2));
+        line.setAttribute('x2', x2.toFixed(2));
+        line.setAttribute('y2', y2.toFixed(2));
+        line.setAttribute('stroke-width', isMajor ? '4.5' : '2');
+        line.setAttribute('class', isMajor ? 'analog-tick analog-tick-major' : 'analog-tick analog-tick-minor');
+        analogTicksGroup.appendChild(line);
+    }
+}
+
+function setHandCoords(lineEl, cx, cy, angleRad, startOffset, endOffset) {
+    const dx = Math.sin(angleRad);
+    const dy = -Math.cos(angleRad);
+    lineEl.setAttribute('x1', (cx + startOffset * dx).toFixed(2));
+    lineEl.setAttribute('y1', (cy + startOffset * dy).toFixed(2));
+    lineEl.setAttribute('x2', (cx + endOffset * dx).toFixed(2));
+    lineEl.setAttribute('y2', (cy + endOffset * dy).toFixed(2));
+}
+
+function renderAnalogHands() {
+    if (!analogGeometry) buildAnalogTicks();
+    if (!analogGeometry) return;
+
+    const { cx, cy, minRadius } = analogGeometry;
+    const now = new Date();
+    const ms = now.getMilliseconds();
+    const sec = now.getSeconds() + ms / 1000;
+    const min = now.getMinutes() + sec / 60;
+    const hr = (now.getHours() % 12) + min / 60;
+
+    const hrAngle = (hr * 30) * Math.PI / 180;
+    const minAngle = (min * 6) * Math.PI / 180;
+    const secAngle = (sec * 6) * Math.PI / 180;
+
+    setHandCoords(analogHourHand, cx, cy, hrAngle, 0, minRadius * 0.56);
+    setHandCoords(analogMinuteHand, cx, cy, minAngle, 0, minRadius * 0.88);
+    setHandCoords(analogSecondHand, cx, cy, secAngle, -minRadius * 0.18, minRadius * 0.94);
+}
+
+function startAnalogAnimation() {
+    if (analogRafId !== null) return;
+    function frame() {
+        if (!isClockMode || clockStyleIdx !== 2) {
+            analogRafId = null;
+            return;
+        }
+        renderAnalogHands();
+        analogRafId = requestAnimationFrame(frame);
+    }
+    renderAnalogHands();
+    analogRafId = requestAnimationFrame(frame);
+}
+
+function stopAnalogAnimation() {
+    if (analogRafId !== null) {
+        cancelAnimationFrame(analogRafId);
+        analogRafId = null;
+    }
+}
+
+function resumeSpotifyFromClock() {
+    spotifyAction('play', 'PUT');
+    if (currentTrackId && currentTrackId !== 'none' && titleText.innerText !== 'Waiting for Spotify...') {
+        currentIsPlaying = true;
+        updateUI(titleText.innerText, artistText.innerText, backgroundImage.src, true);
+    }
+}
+
+function initClock() {
+    buildAnalogTicks();
+    applyClockDimState();
+    applyClockStyle();
+    updateClock(false);
+    if (!clockIntervalId) {
+        clockIntervalId = setInterval(() => updateClock(true), 1000);
+    }
+}
+
+initClock();
 
 // Run auth check on load
 checkAuth();
@@ -461,6 +776,7 @@ document.addEventListener('touchstart', (e) => {
         maxTouches = e.touches.length;
         
         swipeOverlay.style.transition = 'none';
+        swipeOverlay.style.transform = 'translateX(100%)';
         swipeOverlay.style.opacity = '1';
     } else {
         // Update max touches if more fingers land mid-gesture
@@ -510,7 +826,11 @@ document.addEventListener('touchend', (e) => {
     if (maxTouches >= 2) {
         // Handle multi-finger tap
         if (time < 500) {
-            cyclePlaybackMode();
+            if (isClockMode) {
+                toggleClockDim();
+            } else {
+                cyclePlaybackMode();
+            }
             swipeOverlay.style.opacity = '0';
             swipeOverlay.style.transform = 'translateX(100%)';
         } else {
@@ -524,19 +844,38 @@ document.addEventListener('touchend', (e) => {
         swipeOverlay.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
         swipeOverlay.style.transform = 'translateX(0)';
         
-        if (diffX > 0) spotifyAction('previous'); 
-        else spotifyAction('next');
-        
-        setTimeout(() => {
-            if (isProcessingSwipe) fadeOutSwipeTransition();
-        }, 3000);
+        if (isClockMode) {
+            setTimeout(() => {
+                if (diffX < 0) {
+                    clockStyleIdx = (clockStyleIdx + 1) % 3;
+                } else {
+                    clockStyleIdx = (clockStyleIdx + 2) % 3;
+                }
+                localStorage.setItem('clock_style', String(clockStyleIdx));
+                applyClockStyle();
+                fadeOutSwipeTransition();
+            }, 300);
+        } else {
+            if (diffX > 0) spotifyAction('previous'); 
+            else spotifyAction('next');
+            
+            setTimeout(() => {
+                if (isProcessingSwipe) fadeOutSwipeTransition();
+            }, 3000);
+        }
     } else {
         if (Math.abs(diffX) > 10) {
             abortSwipe(diffX);
         } else {
             swipeOverlay.style.opacity = '0';
             swipeOverlay.style.transform = 'translateX(100%)';
-            if (time < 300) togglePlayPause();
+            if (time < 300) {
+                if (isClockMode) {
+                    resumeSpotifyFromClock();
+                } else {
+                    togglePlayPause();
+                }
+            }
         }
     }
 });
@@ -556,7 +895,11 @@ document.addEventListener('click', (e) => {
     if (loginOverlay.style.display !== 'none') return;
     if (Date.now() - lastTouchEnd < 500) return; // Prevent ghost clicks from touch firing twice
     
-    togglePlayPause();
+    if (isClockMode) {
+        resumeSpotifyFromClock();
+    } else {
+        togglePlayPause();
+    }
 });
 
 let popupTimeout = null;
